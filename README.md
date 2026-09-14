@@ -49,40 +49,48 @@ Install the dependencies:
 
 ```bash
 pip install -r requirements.txt
+```
 
 Start the server:
 
+```bash
 python -m uvicorn main:app --reload
+```
 
 Open Swagger UI:
 
+```text
 http://localhost:8000/docs
+```
 
-API Endpoints
-Method	Endpoint	Description
-GET	/	Welcome message
-GET	/health	Health check
-GET	/tasks	Get all tasks
-GET	/tasks/{task_id}	Get one task
-POST	/tasks	Create a task
-PUT	/tasks/{task_id}	Update a task
-DELETE	/tasks/{task_id}	Delete a task
-Example SQL Query
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | Welcome message |
+| GET | `/health` | Health check |
+| GET | `/tasks` | Get all tasks |
+| GET | `/tasks/{task_id}` | Get one task |
+| POST | `/tasks` | Create a task |
+| PUT | `/tasks/{task_id}` | Update a task |
+| DELETE | `/tasks/{task_id}` | Delete a task |
+
+## Example SQL Query
+
+```sql
 SELECT * FROM tasks WHERE done = 1;
+```
 
 This returns all completed tasks.
 
-Database Browser
+## Database Browser
 
 The SQLite database was inspected using DB Browser for SQLite.
 
-<img width="1600" height="854" alt="image" src="https://github.com/user-attachments/assets/6f52d857-813f-4093-abd3-e29ca02260b4" />
+![Database Browser Screenshot](https://github.com/user-attachments/assets/6f52d857-813f-4093-abd3-e29ca02260b4)
 
-
-Persistence
+## Persistence
 
 Tasks are stored in SQLite instead of an in-memory Python list. Therefore, tasks remain available after restarting the FastAPI server.
 
-
-<img width="957" height="1028" alt="image" src="https://github.com/user-attachments/assets/2b93fb84-0e3c-4edb-99c6-3294c7d7d64f" />
-
+![API Persistence Screenshot](https://github.com/user-attachments/assets/2b93fb84-0e3c-4edb-99c6-3294c7d7d64f)
