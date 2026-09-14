@@ -76,14 +76,13 @@ Database Browser
 
 The SQLite database was inspected using DB Browser for SQLite.
 
-A screenshot showing the database contents is included in the project.
+<img width="1600" height="854" alt="image" src="https://github.com/user-attachments/assets/6f52d857-813f-4093-abd3-e29ca02260b4" />
+
 
 Persistence
 
 Tasks are stored in SQLite instead of an in-memory Python list. Therefore, tasks remain available after restarting the FastAPI server.
 
 
-Add your **DB Browser screenshot** to the repository, for example:
+<img width="957" height="1028" alt="image" src="https://github.com/user-attachments/assets/2b93fb84-0e3c-4edb-99c6-3294c7d7d64f" />
 
-```text
-database.png
