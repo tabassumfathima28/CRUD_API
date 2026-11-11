@@ -1,6 +1,6 @@
-# CRUD API with SQLite
+# CRUD API with PostgreSQL
 
-A simple Task CRUD API built using FastAPI and SQLite.
+A simple Task CRUD API built using FastAPI and PostgreSQL.
 
 ## Features
 
@@ -9,7 +9,7 @@ A simple Task CRUD API built using FastAPI and SQLite.
 - Read a single task
 - Update tasks
 - Delete tasks
-- SQLite database persistence
+- PostgreSQL database persistence
 - Automatic database and table creation
 - Initial seed data
 
@@ -17,43 +17,30 @@ A simple Task CRUD API built using FastAPI and SQLite.
 
 - Python
 - FastAPI
-- SQLite
+- PostgreSQL
 - Pydantic
 - Uvicorn
 
-## Why SQLite?
-
-SQLite was used because it is lightweight, requires zero database server setup, and stores the complete database in a single file. Unlike the in-memory version, the data survives server restarts.
-
 ## Database
 
-The database is stored in:
+The application connects to PostgreSQL using `DATABASE_URL`. On startup, it creates the `tasks` table if needed and seeds three example tasks only when the table is empty. The SQL queries use parameters for user-provided values.
 
-`tasks.db`
-
-The file is automatically created when the application starts.
-
-The database contains a `tasks` table with:
-
-- `id` - Primary key
-- `title` - Task title
-- `done` - Completion status stored as 0 or 1
-
-Three example tasks are automatically inserted only when the database is empty.
-
-`tasks.db` is included in `.gitignore`, so a fresh clone creates its own database.
+Keep database credentials in `.env`; do not commit that file. `.env.example` documents the variables needed for local setup.
 
 ## How to Run
 
-Install the dependencies:
+Build and start the API and PostgreSQL database with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+The API is available at `http://localhost:8000`. Compose waits for PostgreSQL to pass its health check before starting the API, and the `taskdata` volume preserves database data across container restarts.
+
+To run the API directly with Python, install the dependencies and provide a PostgreSQL `DATABASE_URL`:
 
 ```bash
 pip install -r requirements.txt
-```
-
-Start the server:
-
-```bash
 python -m uvicorn main:app --reload
 ```
 
@@ -78,19 +65,7 @@ http://localhost:8000/docs
 ## Example SQL Query
 
 ```sql
-SELECT * FROM tasks WHERE done = 1;
+SELECT * FROM tasks WHERE done = TRUE;
 ```
 
 This returns all completed tasks.
-
-## Database Browser
-
-The SQLite database was inspected using DB Browser for SQLite.
-
-![Database Browser Screenshot](https://github.com/user-attachments/assets/6f52d857-813f-4093-abd3-e29ca02260b4)
-
-## Persistence
-
-Tasks are stored in SQLite instead of an in-memory Python list. Therefore, tasks remain available after restarting the FastAPI server.
-
-![API Persistence Screenshot](https://github.com/user-attachments/assets/2b93fb84-0e3c-4edb-99c6-3294c7d7d64f)
