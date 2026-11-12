@@ -1,5 +1,5 @@
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -81,6 +81,23 @@ def health_check():
             status_code=503,
             detail="Database unavailable"
         )
+
+
+@app.get("/public/info")
+def public_info():
+    return {"message": "Welcome stranger! This info is public."}
+
+
+@app.get("/protected/profile")
+def protected_profile(authorization: str | None = Header(default=None)):
+    parts = (authorization or "").split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return JSONResponse(
+            status_code=401,
+            content={"error": "Access token required"},
+        )
+
+    return {"message": "Profile route available"}
 
 
 @app.post("/auth/signup", status_code=201)

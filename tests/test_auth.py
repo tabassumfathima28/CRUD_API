@@ -72,3 +72,29 @@ def test_login_rejects_invalid_credentials(monkeypatch):
 
     assert response.status_code == 401
     assert response.json()["detail"]["error"] == "Invalid email or password"
+
+
+def test_public_info_is_accessible_without_authentication():
+    response = client.get("/public/info")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "message": "Welcome stranger! This info is public."
+    }
+
+
+def test_profile_requires_a_well_formed_bearer_header():
+    for headers in ({}, {"Authorization": "Basic token"}, {"Authorization": "Bearer"}):
+        response = client.get("/protected/profile", headers=headers)
+
+        assert response.status_code == 401
+        assert response.json() == {"error": "Access token required"}
+
+
+def test_profile_accepts_bearer_token_pending_verification():
+    response = client.get(
+        "/protected/profile",
+        headers={"Authorization": "Bearer token"},
+    )
+
+    assert response.status_code == 200
