@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
-from supabase_auth.errors import AuthInvalidCredentialsError
+from supabase_auth.errors import AuthApiError, AuthInvalidCredentialsError
 
 from conftest import app
 from supabase_client import supabase
@@ -91,10 +91,39 @@ def test_profile_requires_a_well_formed_bearer_header():
         assert response.json() == {"error": "Access token required"}
 
 
-def test_profile_accepts_bearer_token_pending_verification():
+def test_profile_returns_verified_user_info(monkeypatch):
+    user = SimpleNamespace(
+        id="user-123",
+        email="person@example.com",
+        created_at="2025-01-02T03:04:05Z",
+        password="must-not-be-returned",
+    )
+    get_user = Mock(return_value=SimpleNamespace(user=user))
+    monkeypatch.setattr(supabase.auth, "get_user", get_user)
+
     response = client.get(
         "/protected/profile",
-        headers={"Authorization": "Bearer token"},
+        headers={"Authorization": "Bearer verified-token"},
     )
 
     assert response.status_code == 200
+    assert response.json() == {
+        "id": "user-123",
+        "email": "person@example.com",
+        "created_at": "2025-01-02T03:04:05Z",
+    }
+    get_user.assert_called_once_with("verified-token")
+
+
+def test_profile_rejects_tampered_token(monkeypatch):
+    get_user = Mock(side_effect=AuthApiError("invalid token", 401, None))
+    monkeypatch.setattr(supabase.auth, "get_user", get_user)
+
+    response = client.get(
+        "/protected/profile",
+        headers={"Authorization": "Bearer tampered-token"},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {"error": "Invalid or expired token"}
+    get_user.assert_called_once_with("tampered-token")

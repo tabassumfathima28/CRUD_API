@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from supabase_auth.errors import (
     AuthApiError,
+    AuthInvalidJwtError,
     AuthInvalidCredentialsError,
     AuthRetryableError,
     AuthWeakPasswordError,
@@ -97,7 +98,32 @@ def protected_profile(authorization: str | None = Header(default=None)):
             content={"error": "Access token required"},
         )
 
-    return {"message": "Profile route available"}
+    try:
+        user_response = supabase.auth.get_user(parts[1])
+    except (AuthApiError, AuthInvalidJwtError) as exc:
+        if isinstance(exc, AuthApiError) and (exc.status >= 500 or exc.status == 429):
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "Authentication service unavailable"},
+            ) from exc
+        return JSONResponse(
+            status_code=401,
+            content={"error": "Invalid or expired token"},
+        )
+    except AuthRetryableError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "Authentication service unavailable"},
+        ) from exc
+
+    user = user_response.user if user_response else None
+    if user is None:
+        return JSONResponse(
+            status_code=401,
+            content={"error": "Invalid or expired token"},
+        )
+
+    return _safe_user_info(user)
 
 
 @app.post("/auth/signup", status_code=201)
