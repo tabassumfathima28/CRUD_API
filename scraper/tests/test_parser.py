@@ -49,7 +49,7 @@ def test_discovery_follows_next_links_for_only_three_pages():
         def __init__(self):
             self.urls = []
 
-        def fetch(self, url, cache_name=None):
+        def fetch(self, url, cache_name=None, retries=0):
             self.urls.append(url)
             return FetchedPage(
                 html=html_by_url[url],

@@ -88,3 +88,20 @@ def test_fetch_retries_timeout_once_after_a_delay(tmp_path):
     assert result.html == "<html>fixture</html>"
     assert session.get.call_count == 2
     assert sleep.call_args_list[0].args == (0.5,)
+
+
+def test_fetch_retries_server_error_but_not_not_found(tmp_path):
+    session = Mock()
+    session.get.side_effect = [
+        FakeResponse(status_code=503),
+        FakeResponse(),
+    ]
+    fetcher = HttpFetcher(tmp_path, session=session, sleep=Mock())
+
+    result = fetcher.fetch(
+        "https://example.test/temporary-error",
+        retries=1,
+    )
+
+    assert result.cache_hit is False
+    assert session.get.call_count == 2
