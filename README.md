@@ -1,118 +1,185 @@
-# CRUD API with Supabase Authentication
+# FlyRank Internship Backend Track
 
-A FastAPI backend that combines the A3 PostgreSQL task CRUD API with Supabase
-Auth signup, login, JWT verification, protected endpoints, and logout.
+A collection of backend development assignments completed as part of the FlyRank Internship Backend Track, using Python.
 
-## Technologies
+This repository contains REST API development, database integration, authentication, containerization, and web scraping projects.
 
+## Projects
+
+### A1–A4: CRUD API with Supabase Authentication
+
+A FastAPI backend combining CRUD operations, PostgreSQL database integration, Docker Compose, and Supabase authentication.
+
+**Technologies**
 - Python 3.14
-- FastAPI and Uvicorn
-- Supabase Auth Python SDK
-- PostgreSQL and psycopg
-- Docker Compose
+- FastAPI
+- Uvicorn
+- SQLite and PostgreSQL
+- Psycopg
+- Supabase Auth
+- Docker and Docker Compose
+- Pytest
 
-## Authentication
+**Features**
+- Create, read, update, and delete operations.
+- Persistent database storage.
+- User signup and login using Supabase Auth.
+- JWT verification.
+- Protected API endpoints.
+- Reusable authentication dependency.
+- Swagger UI documentation.
+- Docker Compose configuration.
 
-Signup and login use Supabase Auth. Login returns a Supabase `access_token` and
-`refresh_token`. Protected requests send the access token as a Bearer token.
-The API verifies it with Supabase Auth's `get_user(token)` and uses the returned
-user record; it does not trust or decode an unverified JWT. Profile responses
-contain only the user's ID, email, and account creation date.
+**Authentication endpoints**
 
-Logout requires a verified Bearer token and revokes the current Supabase
-session using that token. Supabase access tokens remain usable until their
-expiration, so clients should discard the token after logout.
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/auth/signup` | Register a user |
+| POST | `/auth/login` | Log in |
+| POST | `/auth/logout` | Log out |
+| GET | `/protected/profile` | Get authenticated user profile |
+| GET | `/public/info` | Get public information |
 
-## Setup and run
+API documentation is available at `/docs` when the application is running.
 
-1. Copy `.env.example` to `.env`.
-2. Set `POSTGRES_PASSWORD`, `SUPABASE_URL`, and `SUPABASE_KEY`. Use a Supabase
-   anon/public or publishable key only; never use a `service_role` or secret
-   key. Keep `.env` private and out of Git.
-3. Build and start the API and PostgreSQL with one command:
+---
 
-   ```bash
-   docker compose up --build
-   ```
+### A9: The Polite Scraper
 
-The API is available at `http://localhost:8000`; PostgreSQL data persists in
-the `taskdata` Docker volume. Stop the services with `docker compose down`.
+A Python web scraper that collects book information from [Books to Scrape](https://books.toscrape.com/), a practice website designed for web scraping.
 
-## API reference
+**Objective**
 
-| Method | Endpoint | Authentication | Success | Description |
-|---|---|---|---|---|
-| POST | `/auth/signup` | No | 201 | Create a Supabase Auth user |
-| POST | `/auth/login` | No | 200 | Sign in and return access/refresh tokens |
-| POST | `/auth/logout` | Bearer token | 204 | Revoke the verified Supabase session |
-| GET | `/public/info` | No | 200 | Public welcome information |
-| GET | `/protected/profile` | Bearer token | 200 | Return safe authenticated-user information |
-| GET | `/protected/dashboard` | Bearer token | 200 | Protected dashboard response |
-| GET | `/` | No | 200 | Root welcome message |
-| GET | `/health` | No | 200 | Check API and database availability |
-| GET | `/tasks` | No | 200 | List tasks |
-| GET | `/tasks/{task_id}` | No | 200 | Read a task; 404 if missing |
-| POST | `/tasks` | No | 201 | Create a task; 400 for invalid input |
-| PUT | `/tasks/{task_id}` | No | 200 | Update a task; 404 if missing |
-| DELETE | `/tasks/{task_id}` | No | 204 | Delete a task; 404 if missing |
+Download the first three catalogue pages, discover 60 unique books, visit their individual pages, extract information, normalize the data, validate records, and save the results as JSON.
 
-Auth requests with missing fields return 400. Invalid login credentials and
-missing/invalid protected-route tokens return 401. The protected routes return
-401 with `{"error":"Access token required"}` when credentials are missing or
-malformed and `{"error":"Invalid or expired token"}` when Supabase rejects the
-token.
+**Technologies**
+- Python
+- Requests
+- BeautifulSoup4
+- Pydantic
+- JSON
+- Pytest
 
-## Example requests
+**Features**
+- Catalogue discovery across the first three pages.
+- Automatic pagination using the website's next-page links.
+- Extraction of 60 unique book records.
+- HTML caching to avoid unnecessary requests.
+- Custom User-Agent identification.
+- Request timeouts and HTTP status checking.
+- Minimum 0.5-second delay between actual requests.
+- GBP price normalization.
+- Pydantic schema validation.
+- Duplicate record detection.
+- Individual page failure handling.
+- Retry logic for timeouts and HTTP 5xx responses.
+- Automated run reporting.
 
-Signup:
+**Data collected**
 
-```bash
-curl -i -X POST http://localhost:8000/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com","password":"choose-a-password"}'
+Each validated book record contains:
+
+| Field | Description |
+|---|---|
+| `title` | Book title |
+| `product_url` | Book detail page URL |
+| `price_text` | Original price text |
+| `availability_text` | Availability information |
+| `rating_text` | Original rating text |
+| `description` | Book description, if available |
+| `source_page` | Catalogue page where the book was discovered |
+| `fetched_at` | Retrieval timestamp |
+| `price_gbp` | Normalized numeric price in GBP |
+
+**Project structure**
+
+```text
+scraper/
+├── README.md
+├── requirements.txt
+├── .gitignore
+├── src/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── scraper.py
+│   ├── parser.py
+│   ├── models.py
+│   └── utils.py
+├── tests/
+│   ├── __init__.py
+│   ├── test_parser.py
+│   ├── test_utils.py
+│   └── test_failure.py
+├── cache/
+└── output/
+    ├── books.json
+    ├── errors.json
+    └── run-report.json
 ```
 
-Login (use the returned `access_token` and `refresh_token`):
+Generated cache and full output files are kept locally and excluded from Git where appropriate. Sample records and a successful run-report example are included in the repository.
+
+**Run the scraper**
+
+From the repository root:
 
 ```bash
-curl -i -X POST http://localhost:8000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com","password":"choose-a-password"}'
+python -m pip install -r scraper/requirements.txt
+python -m scraper.src.main
 ```
 
-Public information:
+**Run tests**
 
 ```bash
-curl -i http://localhost:8000/public/info
+python -m pytest -q
 ```
 
-Protected profile and dashboard:
+**Verified live run**
+
+The successful live execution processed:
+
+| Metric | Result |
+|---|---:|
+| Catalogue pages | 3 |
+| Detail pages | 60 |
+| Unique book URLs | 60 |
+| Valid records | 60 |
+| Invalid records | 0 |
+| Failed pages | 0 |
+| Network fetches | 63 |
+
+A subsequent execution used the cached HTML pages.
+
+See [`scraper/README.md`](scraper/README.md) for the detailed A9 implementation, installation instructions, execution evidence, and ethical scraping considerations.
+
+---
+
+## Testing
+
+Automated tests are implemented using Pytest.
+
+The final repository-wide test run completed with **32 passing tests**.
 
 ```bash
-curl -i http://localhost:8000/protected/profile \
-  -H "Authorization: Bearer <ACCESS_TOKEN>"
-curl -i http://localhost:8000/protected/dashboard \
-  -H "Authorization: Bearer <ACCESS_TOKEN>"
+python -m pytest -q
 ```
 
-Logout:
+## Ethical Considerations
 
-```bash
-curl -i -X POST http://localhost:8000/auth/logout \
-  -H "Authorization: Bearer <ACCESS_TOKEN>"
-```
+The scraper is intentionally limited to a practice website.
 
-## Swagger UI
+- Use an official API whenever one is available.
+- Check website rules and terms before scraping.
+- Identify the scraper using an honest User-Agent.
+- Avoid unnecessary requests.
+- Respect access restrictions.
+- Never bypass authentication systems or paywalls.
+- Collect only the information required for the task.
 
-Open [http://localhost:8000/docs](http://localhost:8000/docs). Select
-**Authorize**, paste the access token returned by `/auth/login` (without the
-`Bearer ` prefix), and confirm. Protected endpoints display a lock and
-**Try it out** will send the Bearer token automatically.
+I will not reuse this code on another site without checking its rules and terms first.
 
-![Swagger UI showing Bearer authentication](swagger.png)
+## Repository
 
-## Existing task API
+GitHub: [tabassumfathima28/CRUD_API](https://github.com/tabassumfathima28/CRUD_API)
 
-The task API uses `DATABASE_URL`; in Docker Compose the API connects to the
-PostgreSQL service over the Compose network. On startup the application creates
-the `tasks` table if needed and seeds three tasks only when the table is empty.
+This repository documents the practical implementation of backend development concepts through the FlyRank Internship Backend Track.
