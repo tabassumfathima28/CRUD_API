@@ -135,7 +135,13 @@ class HttpFetcher:
             except requests.RequestException as exc:
                 raise FetchError(url, self._reason(exc)) from exc
 
-            html = response.text
+            try:
+                html = self._decode_response(response)
+            except (LookupError, UnicodeDecodeError) as exc:
+                raise FetchError(
+                    url,
+                    f"could not decode response: {self._reason(exc)}",
+                ) from exc
             cached_bytes = html.encode("utf-8")
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             temporary_path = cache_path.with_suffix(cache_path.suffix + ".tmp")
@@ -163,6 +169,25 @@ class HttpFetcher:
     @staticmethod
     def _reason(error: Exception) -> str:
         return str(error) or type(error).__name__
+
+    @staticmethod
+    def _decode_response(response: requests.Response) -> str:
+        content_type = response.headers.get("Content-Type", "")
+        declared_charset = re.search(
+            r"charset\s*=\s*[\"']?([A-Za-z0-9._-]+)",
+            content_type,
+            flags=re.IGNORECASE,
+        )
+        if declared_charset is not None:
+            return response.content.decode(declared_charset.group(1))
+
+        try:
+            return response.content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            encoding = response.apparent_encoding or response.encoding
+            if not encoding:
+                raise
+            return response.content.decode(encoding)
 
     @staticmethod
     def _cache_filename(url: str) -> str:

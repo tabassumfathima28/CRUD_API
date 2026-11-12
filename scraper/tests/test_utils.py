@@ -9,8 +9,11 @@ from scraper.src.utils import FetchError, HttpFetcher, USER_AGENT
 class FakeResponse:
     def __init__(self, content=b"<html>fixture</html>", status_code=200):
         self.content = content
-        self.text = content.decode("utf-8")
+        self.text = content.decode("latin-1")
         self.status_code = status_code
+        self.headers = {"Content-Type": "text/html"}
+        self.encoding = "ISO-8859-1"
+        self.apparent_encoding = "utf-8"
 
     def raise_for_status(self):
         if self.status_code >= 400:
@@ -57,17 +60,34 @@ def test_fetch_sets_user_agent_timeout_and_caches_response(tmp_path, capsys):
     assert "<html>fixture</html>" not in output
 
 
-def test_fetch_checks_http_status_before_caching(tmp_path):
+@pytest.mark.parametrize("status_code", [403, 404])
+def test_fetch_checks_http_status_before_caching_and_does_not_retry(
+    tmp_path,
+    status_code,
+):
     session = Mock()
-    session.get.return_value = FakeResponse(status_code=404)
+    session.get.return_value = FakeResponse(status_code=status_code)
     fetcher = HttpFetcher(tmp_path, session=session, sleep=Mock())
 
     with pytest.raises(FetchError) as error:
         fetcher.fetch("https://example.test/missing", retries=1)
 
-    assert error.value.status_code == 404
+    assert error.value.status_code == status_code
     session.get.assert_called_once()
     assert list(tmp_path.iterdir()) == []
+
+
+def test_fetch_decodes_utf8_when_server_omits_charset(tmp_path):
+    session = Mock()
+    session.get.return_value = FakeResponse(
+        content="<span>£51.77</span>".encode("utf-8")
+    )
+    fetcher = HttpFetcher(tmp_path, session=session, sleep=Mock())
+
+    result = fetcher.fetch("https://example.test/price")
+
+    assert "£51.77" in result.html
+    assert "Â£51.77" not in result.html
 
 
 def test_fetch_retries_timeout_once_after_a_delay(tmp_path):

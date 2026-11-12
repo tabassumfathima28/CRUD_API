@@ -111,6 +111,7 @@ def run_scraper(
         "start_time": start_time.isoformat(),
         "duration_seconds": 0.0,
         "catalogue_pages": 0,
+        "detail_pages": 0,
         "pages_fetched": 0,
         "cache_hits": 0,
         "discovered_urls": 0,
@@ -147,6 +148,7 @@ def run_scraper(
                     report["cache_hits"] += 1
                 else:
                     report["pages_fetched"] += 1
+                report["detail_pages"] += 1
 
                 raw_record = parse_book_detail(
                     page.html,

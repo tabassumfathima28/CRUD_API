@@ -55,6 +55,7 @@ def test_failed_detail_does_not_prevent_valid_and_invalid_outputs(
     assert errors[0]["record"]["title"] is None
     assert errors[0]["errors"]
     assert report["catalogue_pages"] == 1
+    assert report["detail_pages"] == 2
     assert report["discovered_urls"] == 3
     assert report["unique_urls"] == 3
     assert report["pages_fetched"] == 3
@@ -66,6 +67,26 @@ def test_failed_detail_does_not_prevent_valid_and_invalid_outputs(
     assert saved_report == report
     assert failed_url in caplog.text
     assert "simulated HTTP 503" in caplog.text
+
+
+def test_failed_catalogue_still_writes_empty_outputs_and_run_report(tmp_path):
+    class FailedCatalogueFetcher:
+        def fetch(self, url, cache_name=None, retries=0):
+            raise FetchError(url, "simulated timeout")
+
+    output_dir = tmp_path / "output"
+    report = run_scraper(
+        fetcher=FailedCatalogueFetcher(),
+        output_dir=output_dir,
+    )
+
+    assert report["catalogue_pages"] == 0
+    assert report["failed_pages"] == [
+        {"url": START_URL, "reason": "simulated timeout"}
+    ]
+    assert json.loads((output_dir / "books.json").read_text()) == []
+    assert json.loads((output_dir / "errors.json").read_text()) == []
+    assert json.loads((output_dir / "run-report.json").read_text()) == report
 
 
 def _valid_book_html():

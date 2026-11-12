@@ -1,0 +1,25 @@
+{
+  "sample_note": "Metadata excerpt from the successful live run; book description text is omitted from this checked-in sample.",
+  "records": [
+    {
+      "title": "A Light in the Attic",
+      "product_url": "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html",
+      "price_text": "£51.77",
+      "availability_text": "In stock (22 available)",
+      "rating_text": "Three",
+      "source_page": "https://books.toscrape.com/",
+      "fetched_at": "2026-11-12T03:33:42.613153+00:00",
+      "price_gbp": 51.77
+    },
+    {
+      "title": "Tipping the Velvet",
+      "product_url": "https://books.toscrape.com/catalogue/tipping-the-velvet_999/index.html",
+      "price_text": "£53.74",
+      "availability_text": "In stock (20 available)",
+      "rating_text": "One",
+      "source_page": "https://books.toscrape.com/",
+      "fetched_at": "2026-11-12T03:33:42.661907+00:00",
+      "price_gbp": 53.74
+    }
+  ]
+}
