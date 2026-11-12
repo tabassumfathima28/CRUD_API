@@ -199,3 +199,27 @@ def test_logout_rejects_missing_or_invalid_tokens(monkeypatch):
     assert invalid_response.status_code == 401
     assert invalid_response.json() == {"error": "Invalid or expired token"}
     sign_out.assert_not_called()
+
+
+def test_openapi_documents_bearer_auth_only_for_protected_routes():
+    schema = app.openapi()
+    paths = schema["paths"]
+    security_schemes = schema["components"]["securitySchemes"]
+
+    assert security_schemes["SupabaseAccessToken"] == {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Use the access_token returned by /auth/login.",
+    }
+    assert paths["/protected/profile"]["get"]["security"] == [
+        {"SupabaseAccessToken": []}
+    ]
+    assert paths["/protected/dashboard"]["get"]["security"] == [
+        {"SupabaseAccessToken": []}
+    ]
+    assert paths["/auth/logout"]["post"]["security"] == [
+        {"SupabaseAccessToken": []}
+    ]
+    assert "security" not in paths["/public/info"]["get"]
+    assert "security" not in paths["/auth/login"]["post"]

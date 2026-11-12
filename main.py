@@ -16,7 +16,12 @@ from database import get_db
 from supabase_client import supabase
 
 app = FastAPI()
-bearer_scheme = HTTPBearer(auto_error=False)
+bearer_scheme = HTTPBearer(
+    scheme_name="SupabaseAccessToken",
+    bearerFormat="JWT",
+    description="Use the access_token returned by /auth/login.",
+    auto_error=False,
+)
 
 
 class AuthenticationError(Exception):
