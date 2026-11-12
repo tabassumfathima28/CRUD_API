@@ -3,8 +3,15 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from supabase_auth.errors import (
+    AuthApiError,
+    AuthInvalidCredentialsError,
+    AuthRetryableError,
+    AuthWeakPasswordError,
+)
 
 from database import get_db
+from supabase_client import supabase
 
 app = FastAPI()
 
@@ -25,6 +32,28 @@ async def validation_exception_handler(
 class TaskCreate(BaseModel):
     title: str = Field(min_length=1)
     done: bool = False
+
+
+class AuthCredentials(BaseModel):
+    email: str = Field(min_length=1)
+    password: str = Field(min_length=1)
+
+
+def _safe_user_info(user):
+    return {
+        "id": user.id,
+        "email": user.email,
+        "created_at": user.created_at,
+    }
+
+
+def _auth_response(auth_response):
+    session = auth_response.session
+    return {
+        "user": _safe_user_info(auth_response.user),
+        "access_token": session.access_token if session else None,
+        "refresh_token": session.refresh_token if session else None,
+    }
 
 
 # Convert database row to dictionary
@@ -52,6 +81,52 @@ def health_check():
             status_code=503,
             detail="Database unavailable"
         )
+
+
+@app.post("/auth/signup", status_code=201)
+def signup(credentials: AuthCredentials):
+    try:
+        auth_response = supabase.auth.sign_up(
+            {
+                "email": credentials.email,
+                "password": credentials.password,
+            }
+        )
+    except (AuthApiError, AuthWeakPasswordError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Signup failed"},
+        ) from exc
+    except AuthRetryableError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "Authentication service unavailable"},
+        ) from exc
+
+    return _auth_response(auth_response)
+
+
+@app.post("/auth/login")
+def login(credentials: AuthCredentials):
+    try:
+        auth_response = supabase.auth.sign_in_with_password(
+            {
+                "email": credentials.email,
+                "password": credentials.password,
+            }
+        )
+    except (AuthApiError, AuthInvalidCredentialsError) as exc:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "Invalid email or password"},
+        ) from exc
+    except AuthRetryableError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "Authentication service unavailable"},
+        ) from exc
+
+    return _auth_response(auth_response)
 
 
 # GET all tasks
