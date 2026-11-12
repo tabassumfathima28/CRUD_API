@@ -1,0 +1,12 @@
+__pycache__/
+.pytest_cache/
+.venv/
+*.py[cod]
+*.tmp
+
+cache/*
+!cache/.gitkeep
+
+output/books.json
+output/errors.json
+output/run-report.json
