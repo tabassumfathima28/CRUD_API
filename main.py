@@ -163,7 +163,12 @@ def signup(credentials: AuthCredentials):
                 "password": credentials.password,
             }
         )
-    except (AuthApiError, AuthWeakPasswordError) as exc:
+    except AuthApiError as exc:
+        raise HTTPException(
+            status_code=400 if exc.status < 500 and exc.status != 429 else 503,
+            detail={"error": "Signup failed"},
+        ) from exc
+    except AuthWeakPasswordError as exc:
         raise HTTPException(
             status_code=400,
             detail={"error": "Signup failed"},
@@ -186,7 +191,13 @@ def login(credentials: AuthCredentials):
                 "password": credentials.password,
             }
         )
-    except (AuthApiError, AuthInvalidCredentialsError) as exc:
+    except AuthApiError as exc:
+        status_code = 401 if exc.status < 500 and exc.status != 429 else 503
+        raise HTTPException(
+            status_code=status_code,
+            detail={"error": "Invalid email or password"},
+        ) from exc
+    except AuthInvalidCredentialsError as exc:
         raise HTTPException(
             status_code=401,
             detail={"error": "Invalid email or password"},
@@ -203,10 +214,10 @@ def login(credentials: AuthCredentials):
 @app.post("/auth/logout", status_code=204)
 def logout(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    user=Depends(get_authenticated_user),
+    _user=Depends(get_authenticated_user),
 ):
     try:
-        supabase.auth.admin.sign_out(credentials.credentials, scope="global")
+        supabase.auth.admin.sign_out(credentials.credentials, scope="local")
     except (AuthApiError, AuthInvalidJwtError) as exc:
         status_code = exc.status if isinstance(exc, AuthApiError) else 502
         raise AuthenticationError(

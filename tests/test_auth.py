@@ -74,6 +74,18 @@ def test_login_rejects_invalid_credentials(monkeypatch):
     assert response.json()["detail"]["error"] == "Invalid email or password"
 
 
+def test_auth_provider_outage_is_not_mislabeled_as_invalid_login(monkeypatch):
+    sign_in = Mock(side_effect=AuthApiError("unavailable", 500, None))
+    monkeypatch.setattr(supabase.auth, "sign_in_with_password", sign_in)
+
+    response = client.post(
+        "/auth/login",
+        json={"email": "person@example.com", "password": "valid-password"},
+    )
+
+    assert response.status_code == 503
+
+
 def test_public_info_is_accessible_without_authentication():
     response = client.get("/public/info")
 
@@ -175,7 +187,7 @@ def test_logout_revokes_verified_token_without_shared_session(monkeypatch):
 
     assert response.status_code == 204
     assert response.content == b""
-    sign_out.assert_called_once_with("verified-token", scope="global")
+    sign_out.assert_called_once_with("verified-token", scope="local")
 
 
 def test_logout_rejects_missing_or_invalid_tokens(monkeypatch):

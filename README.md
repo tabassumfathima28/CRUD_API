@@ -1,71 +1,118 @@
-# CRUD API with PostgreSQL
+# CRUD API with Supabase Authentication
 
-A simple Task CRUD API built using FastAPI and PostgreSQL.
-
-## Features
-
-- Create tasks
-- Read all tasks
-- Read a single task
-- Update tasks
-- Delete tasks
-- PostgreSQL database persistence
-- Automatic database and table creation
-- Initial seed data
+A FastAPI backend that combines the A3 PostgreSQL task CRUD API with Supabase
+Auth signup, login, JWT verification, protected endpoints, and logout.
 
 ## Technologies
 
-- Python
-- FastAPI
-- PostgreSQL
-- Pydantic
-- Uvicorn
+- Python 3.14
+- FastAPI and Uvicorn
+- Supabase Auth Python SDK
+- PostgreSQL and psycopg
+- Docker Compose
 
-## Database
+## Authentication
 
-The application connects to PostgreSQL using `DATABASE_URL`. On startup, it creates the `tasks` table if needed and seeds three example tasks only when the table is empty. The SQL queries use parameters for user-provided values.
+Signup and login use Supabase Auth. Login returns a Supabase `access_token` and
+`refresh_token`. Protected requests send the access token as a Bearer token.
+The API verifies it with Supabase Auth's `get_user(token)` and uses the returned
+user record; it does not trust or decode an unverified JWT. Profile responses
+contain only the user's ID, email, and account creation date.
 
-Keep database credentials in `.env`; do not commit that file. `.env.example` documents the variables needed for local setup.
+Logout requires a verified Bearer token and revokes the current Supabase
+session using that token. Supabase access tokens remain usable until their
+expiration, so clients should discard the token after logout.
 
-## How to Run
+## Setup and run
 
-Build and start the API and PostgreSQL database with Docker Compose:
+1. Copy `.env.example` to `.env`.
+2. Set `POSTGRES_PASSWORD`, `SUPABASE_URL`, and `SUPABASE_KEY`. Use a Supabase
+   anon/public or publishable key only; never use a `service_role` or secret
+   key. Keep `.env` private and out of Git.
+3. Build and start the API and PostgreSQL with one command:
+
+   ```bash
+   docker compose up --build
+   ```
+
+The API is available at `http://localhost:8000`; PostgreSQL data persists in
+the `taskdata` Docker volume. Stop the services with `docker compose down`.
+
+## API reference
+
+| Method | Endpoint | Authentication | Success | Description |
+|---|---|---|---|---|
+| POST | `/auth/signup` | No | 201 | Create a Supabase Auth user |
+| POST | `/auth/login` | No | 200 | Sign in and return access/refresh tokens |
+| POST | `/auth/logout` | Bearer token | 204 | Revoke the verified Supabase session |
+| GET | `/public/info` | No | 200 | Public welcome information |
+| GET | `/protected/profile` | Bearer token | 200 | Return safe authenticated-user information |
+| GET | `/protected/dashboard` | Bearer token | 200 | Protected dashboard response |
+| GET | `/` | No | 200 | Root welcome message |
+| GET | `/health` | No | 200 | Check API and database availability |
+| GET | `/tasks` | No | 200 | List tasks |
+| GET | `/tasks/{task_id}` | No | 200 | Read a task; 404 if missing |
+| POST | `/tasks` | No | 201 | Create a task; 400 for invalid input |
+| PUT | `/tasks/{task_id}` | No | 200 | Update a task; 404 if missing |
+| DELETE | `/tasks/{task_id}` | No | 204 | Delete a task; 404 if missing |
+
+Auth requests with missing fields return 400. Invalid login credentials and
+missing/invalid protected-route tokens return 401. The protected routes return
+401 with `{"error":"Access token required"}` when credentials are missing or
+malformed and `{"error":"Invalid or expired token"}` when Supabase rejects the
+token.
+
+## Example requests
+
+Signup:
 
 ```bash
-docker compose up --build
+curl -i -X POST http://localhost:8000/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","password":"choose-a-password"}'
 ```
 
-The API is available at `http://localhost:8000`. Compose waits for PostgreSQL to pass its health check before starting the API, and the `taskdata` volume preserves database data across container restarts.
-
-To run the API directly with Python, install the dependencies and provide a PostgreSQL `DATABASE_URL`:
+Login (use the returned `access_token` and `refresh_token`):
 
 ```bash
-pip install -r requirements.txt
-python -m uvicorn main:app --reload
+curl -i -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","password":"choose-a-password"}'
 ```
 
-Open Swagger UI:
+Public information:
 
-```text
-http://localhost:8000/docs
+```bash
+curl -i http://localhost:8000/public/info
 ```
 
-## API Endpoints
+Protected profile and dashboard:
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | Welcome message |
-| GET | `/health` | Health check |
-| GET | `/tasks` | Get all tasks |
-| GET | `/tasks/{task_id}` | Get one task |
-| POST | `/tasks` | Create a task |
-| PUT | `/tasks/{task_id}` | Update a task |
-| DELETE | `/tasks/{task_id}` | Delete a task |
-
-## Example SQL Query
-
-```sql
-SELECT * FROM tasks WHERE done = TRUE;
+```bash
+curl -i http://localhost:8000/protected/profile \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+curl -i http://localhost:8000/protected/dashboard \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
-This returns all completed tasks.
+Logout:
+
+```bash
+curl -i -X POST http://localhost:8000/auth/logout \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+```
+
+## Swagger UI
+
+Open [http://localhost:8000/docs](http://localhost:8000/docs). Select
+**Authorize**, paste the access token returned by `/auth/login` (without the
+`Bearer ` prefix), and confirm. Protected endpoints display a lock and
+**Try it out** will send the Bearer token automatically.
+
+![Swagger UI showing Bearer authentication](swagger.png)
+
+## Existing task API
+
+The task API uses `DATABASE_URL`; in Docker Compose the API connects to the
+PostgreSQL service over the Compose network. On startup the application creates
+the `tasks` table if needed and seeds three tasks only when the table is empty.
