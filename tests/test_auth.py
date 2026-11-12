@@ -127,3 +127,75 @@ def test_profile_rejects_tampered_token(monkeypatch):
     assert response.status_code == 401
     assert response.json() == {"error": "Invalid or expired token"}
     get_user.assert_called_once_with("tampered-token")
+
+
+def test_dashboard_requires_authentication():
+    response = client.get("/protected/dashboard")
+
+    assert response.status_code == 401
+    assert response.json() == {"error": "Access token required"}
+
+
+def test_dashboard_injects_verified_user(monkeypatch):
+    user = SimpleNamespace(
+        id="user-123",
+        email="person@example.com",
+        created_at="2025-01-02T03:04:05Z",
+    )
+    monkeypatch.setattr(
+        supabase.auth,
+        "get_user",
+        Mock(return_value=SimpleNamespace(user=user)),
+    )
+
+    response = client.get(
+        "/protected/dashboard",
+        headers={"Authorization": "Bearer verified-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["user"]["id"] == "user-123"
+
+
+def test_logout_revokes_verified_token_without_shared_session(monkeypatch):
+    user = SimpleNamespace(
+        id="user-123",
+        email="person@example.com",
+        created_at="2025-01-02T03:04:05Z",
+    )
+    get_user = Mock(return_value=SimpleNamespace(user=user))
+    sign_out = Mock()
+    monkeypatch.setattr(supabase.auth, "get_user", get_user)
+    monkeypatch.setattr(supabase.auth.admin, "sign_out", sign_out)
+
+    response = client.post(
+        "/auth/logout",
+        headers={"Authorization": "Bearer verified-token"},
+    )
+
+    assert response.status_code == 204
+    assert response.content == b""
+    sign_out.assert_called_once_with("verified-token", scope="global")
+
+
+def test_logout_rejects_missing_or_invalid_tokens(monkeypatch):
+    missing_response = client.post("/auth/logout")
+    assert missing_response.status_code == 401
+    assert missing_response.json() == {"error": "Access token required"}
+
+    monkeypatch.setattr(
+        supabase.auth,
+        "get_user",
+        Mock(side_effect=AuthApiError("invalid token", 401, None)),
+    )
+    sign_out = Mock()
+    monkeypatch.setattr(supabase.auth.admin, "sign_out", sign_out)
+
+    invalid_response = client.post(
+        "/auth/logout",
+        headers={"Authorization": "Bearer invalid-token"},
+    )
+
+    assert invalid_response.status_code == 401
+    assert invalid_response.json() == {"error": "Invalid or expired token"}
+    sign_out.assert_not_called()

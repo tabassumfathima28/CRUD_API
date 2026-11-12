@@ -1,12 +1,13 @@
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from supabase_auth.errors import (
     AuthApiError,
-    AuthInvalidJwtError,
     AuthInvalidCredentialsError,
+    AuthInvalidJwtError,
     AuthRetryableError,
     AuthWeakPasswordError,
 )
@@ -15,6 +16,13 @@ from database import get_db
 from supabase_client import supabase
 
 app = FastAPI()
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+class AuthenticationError(Exception):
+    def __init__(self, status_code: int, message: str):
+        self.status_code = status_code
+        self.message = message
 
 
 # Validation error handler
@@ -26,6 +34,17 @@ async def validation_exception_handler(
     return JSONResponse(
         status_code=400,
         content={"detail": exc.errors()}
+    )
+
+
+@app.exception_handler(AuthenticationError)
+async def authentication_exception_handler(
+    request: Request,
+    exc: AuthenticationError,
+):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": exc.message},
     )
 
 
@@ -55,6 +74,34 @@ def _auth_response(auth_response):
         "access_token": session.access_token if session else None,
         "refresh_token": session.refresh_token if session else None,
     }
+
+
+def get_authenticated_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+):
+    if credentials is None or not credentials.credentials:
+        raise AuthenticationError(401, "Access token required")
+
+    try:
+        user_response = supabase.auth.get_user(credentials.credentials)
+    except (AuthApiError, AuthInvalidJwtError) as exc:
+        if isinstance(exc, AuthApiError) and (exc.status >= 500 or exc.status == 429):
+            raise AuthenticationError(
+                503,
+                "Authentication service unavailable",
+            ) from exc
+        raise AuthenticationError(401, "Invalid or expired token") from exc
+    except AuthRetryableError as exc:
+        raise AuthenticationError(
+            503,
+            "Authentication service unavailable",
+        ) from exc
+
+    user = user_response.user if user_response else None
+    if user is None:
+        raise AuthenticationError(401, "Invalid or expired token")
+
+    return user
 
 
 # Convert database row to dictionary
@@ -90,40 +137,16 @@ def public_info():
 
 
 @app.get("/protected/profile")
-def protected_profile(authorization: str | None = Header(default=None)):
-    parts = (authorization or "").split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        return JSONResponse(
-            status_code=401,
-            content={"error": "Access token required"},
-        )
-
-    try:
-        user_response = supabase.auth.get_user(parts[1])
-    except (AuthApiError, AuthInvalidJwtError) as exc:
-        if isinstance(exc, AuthApiError) and (exc.status >= 500 or exc.status == 429):
-            raise HTTPException(
-                status_code=503,
-                detail={"error": "Authentication service unavailable"},
-            ) from exc
-        return JSONResponse(
-            status_code=401,
-            content={"error": "Invalid or expired token"},
-        )
-    except AuthRetryableError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail={"error": "Authentication service unavailable"},
-        ) from exc
-
-    user = user_response.user if user_response else None
-    if user is None:
-        return JSONResponse(
-            status_code=401,
-            content={"error": "Invalid or expired token"},
-        )
-
+def protected_profile(user=Depends(get_authenticated_user)):
     return _safe_user_info(user)
+
+
+@app.get("/protected/dashboard")
+def protected_dashboard(user=Depends(get_authenticated_user)):
+    return {
+        "message": "Welcome to your dashboard.",
+        "user": _safe_user_info(user),
+    }
 
 
 @app.post("/auth/signup", status_code=201)
@@ -170,6 +193,25 @@ def login(credentials: AuthCredentials):
         ) from exc
 
     return _auth_response(auth_response)
+
+
+@app.post("/auth/logout", status_code=204)
+def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    user=Depends(get_authenticated_user),
+):
+    try:
+        supabase.auth.admin.sign_out(credentials.credentials, scope="global")
+    except (AuthApiError, AuthInvalidJwtError) as exc:
+        status_code = exc.status if isinstance(exc, AuthApiError) else 502
+        raise AuthenticationError(
+            status_code,
+            "Logout failed",
+        ) from exc
+    except AuthRetryableError as exc:
+        raise AuthenticationError(503, "Authentication service unavailable") from exc
+
+    return Response(status_code=204)
 
 
 # GET all tasks
