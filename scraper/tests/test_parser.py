@@ -1,4 +1,4 @@
-from scraper.src.parser import parse_catalogue_page
+from scraper.src.parser import parse_book_detail, parse_catalogue_page
 from scraper.src.scraper import CATALOGUE_PAGE_LIMIT, discover_books
 from scraper.src.utils import FetchedPage
 
@@ -73,6 +73,60 @@ def test_discovery_follows_next_links_for_only_three_pages():
     assert result.books[0].source_page == catalogue_urls[0]
     assert result.pages_fetched == 3
     assert result.cache_hits == 0
+
+
+def test_book_detail_extracts_eight_raw_fields_and_optional_description():
+    html = """
+    <html><body>
+      <div class="product_main">
+        <h1> A Book Title </h1>
+        <p class="price_color">£51.77</p>
+        <p class="instock availability"><i></i> In stock (22 available)</p>
+        <p class="star-rating Three"></p>
+      </div>
+      <div id="product_description"></div>
+      <p>A short description.</p>
+    </body></html>
+    """
+
+    record = parse_book_detail(
+        html,
+        product_url="https://books.toscrape.com/catalogue/a-book/index.html",
+        source_page="https://books.toscrape.com/",
+        fetched_at="2026-11-12T03:00:00+00:00",
+    )
+
+    assert set(record) == {
+        "title",
+        "product_url",
+        "price_text",
+        "availability_text",
+        "rating_text",
+        "description",
+        "source_page",
+        "fetched_at",
+    }
+    assert record["title"] == "A Book Title"
+    assert record["price_text"] == "£51.77"
+    assert record["availability_text"] == "In stock (22 available)"
+    assert record["rating_text"] == "Three"
+    assert record["description"] == "A short description."
+
+
+def test_book_detail_uses_none_for_missing_description_and_fields():
+    record = parse_book_detail(
+        "<html><body><p>Unexpected markup</p></body></html>",
+        product_url="https://books.toscrape.com/book/index.html",
+        source_page="https://books.toscrape.com/",
+        fetched_at="2026-11-12T03:00:00+00:00",
+    )
+
+    assert record["description"] is None
+    assert record["title"] is None
+    assert record["price_text"] is None
+    assert record["availability_text"] is None
+    assert record["rating_text"] is None
+    assert len(record) == 8
 
 
 def _catalogue_html(book_paths: list[str], next_path: str) -> str:

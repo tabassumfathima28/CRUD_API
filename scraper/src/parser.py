@@ -23,3 +23,39 @@ def parse_catalogue_page(
         else None
     )
     return book_urls, next_url
+
+
+def parse_book_detail(
+    html: str,
+    product_url: str,
+    source_page: str,
+    fetched_at: str,
+) -> dict[str, str | None]:
+    """Extract the eight raw fields from one book detail page."""
+    soup = BeautifulSoup(html, "html.parser")
+    title = soup.select_one("div.product_main h1")
+    price = soup.select_one("div.product_main .price_color")
+    availability = soup.select_one("div.product_main .availability")
+    rating = soup.select_one("div.product_main p.star-rating")
+    description = soup.select_one("#product_description + p")
+
+    rating_classes = rating.get("class", []) if rating else []
+    rating_text = next(
+        (class_name for class_name in rating_classes if class_name != "star-rating"),
+        None,
+    )
+
+    return {
+        "title": title.get_text(strip=True) if title else None,
+        "product_url": product_url,
+        "price_text": price.get_text(strip=True) if price else None,
+        "availability_text": (
+            availability.get_text(" ", strip=True) if availability else None
+        ),
+        "rating_text": rating_text,
+        "description": (
+            description.get_text(" ", strip=True) if description else None
+        ),
+        "source_page": source_page,
+        "fetched_at": fetched_at,
+    }
